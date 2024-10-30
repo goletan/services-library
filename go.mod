@@ -2,14 +2,14 @@ module github.com/goletan/services
 
 go 1.23.2
 
-replace github.com/goletan/observability => ../observability
-
-replace github.com/goletan/config => ../config
-
 require (
 	github.com/goletan/observability v0.0.0-00010101000000-000000000000
 	go.uber.org/zap v1.27.0
 )
+
+replace github.com/goletan/config => ../config
+
+replace github.com/goletan/observability => ../observability
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
