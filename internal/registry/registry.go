@@ -1,27 +1,21 @@
-// /services/internal/registry/registry.go
 package registry
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
 	observability "github.com/goletan/observability/pkg"
 	"github.com/goletan/services/internal/metrics"
+	"github.com/goletan/services/internal/types" // Use the types package for Service interface
+
 	"go.uber.org/zap"
 )
 
-// Service interface that all services must implement.
-type Service interface {
-	Name() string
-	Initialize() error
-	Start() error
-	Stop() error
-}
-
 // Registry manages the lifecycle of services.
 type Registry struct {
-	services      map[string]Service
+	services      map[string]types.Service
 	mu            sync.RWMutex
 	observability *observability.Observability
 	metrics       *metrics.ServicesMetrics
@@ -30,21 +24,21 @@ type Registry struct {
 // NewRegistry creates a new Registry instance with observability and metrics.
 func NewRegistry(obs *observability.Observability, met *metrics.ServicesMetrics) *Registry {
 	return &Registry{
-		services:      make(map[string]Service),
+		services:      make(map[string]types.Service),
 		observability: obs,
 		metrics:       met,
 	}
 }
 
 // RegisterService adds a new service to the registry.
-func (r *Registry) RegisterService(service Service) error {
+func (r *Registry) RegisterService(service types.Service) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	name := service.Name()
 	if _, exists := r.services[name]; exists {
-		r.observability.Logger.Error("service %s already registered", zap.String("service", name))
-		return nil
+		r.observability.Logger.Error("Service already registered", zap.String("service", name))
+		return errors.New("service already registered: " + name)
 	}
 
 	r.services[name] = service
@@ -60,13 +54,12 @@ func (r *Registry) InitializeAll(ctx context.Context) error {
 	var initErrors []error
 	for name, service := range r.services {
 		_, span := r.observability.Tracer.Start(ctx, "InitializeService")
-		defer span.End()
-
 		startTime := time.Now()
+
 		err := service.Initialize()
 		duration := time.Since(startTime).Seconds()
-
 		r.metrics.ObserveExecution(name, "initialize", duration)
+		span.End()
 
 		if err != nil {
 			initErrors = append(initErrors, err)
@@ -89,13 +82,12 @@ func (r *Registry) StartAll(ctx context.Context) error {
 	var startErrors []error
 	for name, service := range r.services {
 		_, span := r.observability.Tracer.Start(ctx, "StartService")
-		defer span.End()
-
 		startTime := time.Now()
+
 		err := service.Start()
 		duration := time.Since(startTime).Seconds()
-
 		r.metrics.ObserveExecution(name, "start", duration)
+		span.End()
 
 		if err != nil {
 			startErrors = append(startErrors, err)
@@ -118,13 +110,12 @@ func (r *Registry) StopAll(ctx context.Context) error {
 	var stopErrors []error
 	for name, service := range r.services {
 		_, span := r.observability.Tracer.Start(ctx, "StopService")
-		defer span.End()
-
 		startTime := time.Now()
+
 		err := service.Stop()
 		duration := time.Since(startTime).Seconds()
-
 		r.metrics.ObserveExecution(name, "stop", duration)
+		span.End()
 
 		if err != nil {
 			stopErrors = append(stopErrors, err)

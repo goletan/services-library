@@ -9,11 +9,21 @@ import (
 	"github.com/goletan/services/internal/registry"
 )
 
+// Service interface that all services must implement.
+type Service interface {
+	Name() string
+	Initialize() error
+	Start() error
+	Stop() error
+}
+
+// Services struct encapsulates the service registry and metrics.
 type Services struct {
 	Registry *registry.Registry
 	Metrics  *metrics.ServicesMetrics
 }
 
+// NewServices creates and returns a new Services instance with observability.
 func NewServices(obs *observability.Observability) *Services {
 	met := metrics.InitMetrics(obs)
 	reg := registry.NewRegistry(obs, met)
