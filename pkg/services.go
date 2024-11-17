@@ -7,6 +7,7 @@ import (
 	observability "github.com/goletan/observability/pkg"
 	"github.com/goletan/services/internal/metrics"
 	"github.com/goletan/services/internal/registry"
+	"github.com/goletan/services/internal/types"
 )
 
 // Service interface that all services must implement.
@@ -31,6 +32,11 @@ func NewServices(obs *observability.Observability) *Services {
 		Registry: reg,
 		Metrics:  met,
 	}
+}
+
+// Register a service in the Registry
+func (s *Services) Register(service types.Service) error {
+	return s.Registry.Register(service)
 }
 
 // InitializeAll initializes all services via registry.

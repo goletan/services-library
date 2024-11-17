@@ -31,7 +31,7 @@ func NewRegistry(obs *observability.Observability, met *metrics.ServicesMetrics)
 }
 
 // RegisterService adds a new service to the registry.
-func (r *Registry) RegisterService(service types.Service) error {
+func (r *Registry) Register(service types.Service) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
