@@ -8,9 +8,9 @@ require (
 	go.uber.org/zap v1.27.0
 )
 
-replace github.com/goletan/config => ../config
+replace github.com/goletan/config => github.com/goletan/config v0.0.0-20241117132450-f61d955a9e0c
 
-replace github.com/goletan/observability => ../observability
+replace github.com/goletan/observability => github.com/goletan/observability v0.0.0-20241117132404-5648f11b3f84
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -19,7 +19,7 @@ require (
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/goletan/config v0.0.0-00010101000000-000000000000 // indirect
+	github.com/goletan/config v0.0.0-20241117132450-f61d955a9e0c // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.22.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
