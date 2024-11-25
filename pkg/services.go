@@ -7,7 +7,7 @@ import (
 	observability "github.com/goletan/observability/pkg"
 	"github.com/goletan/services/internal/metrics"
 	"github.com/goletan/services/internal/registry"
-	"github.com/goletan/services/internal/types"
+	"github.com/goletan/services/shared/types"
 )
 
 // Service interface that all services must implement.
@@ -52,4 +52,8 @@ func (s *Services) StartAll(ctx context.Context) error {
 // StopAll stops all services via registry.
 func (s *Services) StopAll(ctx context.Context) error {
 	return s.Registry.StopAll(ctx)
+}
+
+func (s *Services) Discover(ctx context.Context, namespace string) ([]types.ServiceEndpoint, error) {
+	return s.Registry.Discover(ctx, namespace)
 }

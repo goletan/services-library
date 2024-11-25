@@ -1,3 +1,4 @@
+// /services/internal/registry/registry.go
 package registry
 
 import (
@@ -8,7 +9,10 @@ import (
 
 	observability "github.com/goletan/observability/pkg"
 	"github.com/goletan/services/internal/metrics"
-	"github.com/goletan/services/internal/types" // Use the types package for Service interface
+	"github.com/goletan/services/shared/types"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	"go.uber.org/zap"
 )
@@ -128,4 +132,32 @@ func (r *Registry) StopAll(ctx context.Context) error {
 		return stopErrors[0] // Return the first error
 	}
 	return nil
+}
+
+func (r *Registry) Discover(ctx context.Context, namespace string) ([]types.ServiceEndpoint, error) {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	services, err := clientset.CoreV1().Services(namespace).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	var endpoints []types.ServiceEndpoint
+	for _, svc := range services.Items {
+		endpoints = append(endpoints, types.ServiceEndpoint{
+			Name:    svc.Name,
+			Address: svc.Spec.ClusterIP,
+			Ports:   svc.Spec.Ports, // Add additional processing for ports
+		})
+	}
+
+	return endpoints, nil
 }
