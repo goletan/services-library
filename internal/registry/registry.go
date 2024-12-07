@@ -1,4 +1,3 @@
-// /services/internal/registry/registry.go
 package registry
 
 import (
@@ -10,9 +9,12 @@ import (
 	observability "github.com/goletan/observability/pkg"
 	"github.com/goletan/services/internal/metrics"
 	"github.com/goletan/services/shared/types"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 
 	"go.uber.org/zap"
 )
@@ -155,9 +157,114 @@ func (r *Registry) Discover(ctx context.Context, namespace string) ([]types.Serv
 		endpoints = append(endpoints, types.ServiceEndpoint{
 			Name:    svc.Name,
 			Address: svc.Spec.ClusterIP,
-			Ports:   svc.Spec.Ports, // Add additional processing for ports
 		})
 	}
 
 	return endpoints, nil
+}
+
+func (r *Registry) DiscoverByTag(ctx context.Context, namespace, tag string) ([]types.ServiceEndpoint, error) {
+	endpoints, err := r.Discover(ctx, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	var filtered []types.ServiceEndpoint
+	for _, endpoint := range endpoints {
+		for _, endpointTag := range endpoint.Tags {
+			if endpointTag == tag {
+				filtered = append(filtered, endpoint)
+				break
+			}
+		}
+	}
+	return filtered, nil
+}
+
+func (r *Registry) Watch(ctx context.Context, namespace, tag string) (<-chan types.ServiceEvent, error) {
+	eventsChan := make(chan types.ServiceEvent)
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(
+		clientset,
+		0, // No resync period
+		informers.WithNamespace(namespace),
+	)
+
+	serviceInformer := informerFactory.Core().V1().Services().Informer()
+
+	// Add event handlers for added, updated, and deleted events
+	serviceInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			svc := obj.(*v1.Service)
+			if hasTag(svc, tag) {
+				eventsChan <- types.ServiceEvent{
+					Type: "ADDED",
+					Service: types.ServiceEndpoint{
+						Name:    svc.Name,
+						Address: svc.Spec.ClusterIP,
+						Ports:   svc.Spec.Ports,
+					},
+				}
+			}
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			svc := newObj.(*v1.Service)
+			if hasTag(svc, tag) {
+				eventsChan <- types.ServiceEvent{
+					Type: "MODIFIED",
+					Service: types.ServiceEndpoint{
+						Name:    svc.Name,
+						Address: svc.Spec.ClusterIP,
+						Ports:   svc.Spec.Ports,
+					},
+				}
+			}
+		},
+		DeleteFunc: func(obj interface{}) {
+			svc := obj.(*v1.Service)
+			if hasTag(svc, tag) {
+				eventsChan <- types.ServiceEvent{
+					Type: "DELETED",
+					Service: types.ServiceEndpoint{
+						Name:    svc.Name,
+						Address: svc.Spec.ClusterIP,
+						Ports:   svc.Spec.Ports,
+					},
+				}
+			}
+		},
+	})
+
+	go serviceInformer.Run(ctx.Done())
+
+	return eventsChan, nil
+}
+
+func (r *Registry) StopWatch(ctx context.Context) error {
+	r.observability.Logger.Info("Stopping service watcher...")
+	// Simply cancel the context to stop watching
+	if cancelFunc, ok := ctx.Value("cancelFunc").(context.CancelFunc); ok {
+		cancelFunc()
+	}
+	return nil
+}
+
+// Helper function to check if a service has the desired tag
+func hasTag(svc *v1.Service, tag string) bool {
+	// Example: Tags could be stored in annotations
+	for k, v := range svc.Annotations {
+		if k == "tag" && v == tag {
+			return true
+		}
+	}
+	return false
 }

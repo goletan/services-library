@@ -3,16 +3,11 @@ module github.com/goletan/services
 go 1.23
 
 require (
-	github.com/goletan/observability v0.0.0-00010101000000-000000000000
 	github.com/prometheus/client_golang v1.20.4
 	go.uber.org/zap v1.27.0
 	k8s.io/apimachinery v0.31.3
 	k8s.io/client-go v0.31.3
 )
-
-replace github.com/goletan/config => github.com/goletan/config v0.0.0-20241117132450-f61d955a9e0c
-
-replace github.com/goletan/observability => github.com/goletan/observability v0.0.0-20241117132404-5648f11b3f84
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect

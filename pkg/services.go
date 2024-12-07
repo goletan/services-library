@@ -1,4 +1,3 @@
-// /services/pkg/services.go
 package services
 
 import (
@@ -56,4 +55,16 @@ func (s *Services) StopAll(ctx context.Context) error {
 
 func (s *Services) Discover(ctx context.Context, namespace string) ([]types.ServiceEndpoint, error) {
 	return s.Registry.Discover(ctx, namespace)
+}
+
+func (s *Services) DiscoverByTag(ctx context.Context, namespace, tag string) ([]types.ServiceEndpoint, error) {
+	return s.Registry.Discover(ctx, namespace)
+}
+
+func (s *Services) Watch(ctx context.Context, namespace, tag string) (<-chan types.ServiceEvent, error) {
+	return s.Registry.Watch(ctx, namespace, tag)
+}
+
+func (s *Services) StopWatch(ctx context.Context) error {
+	return s.Registry.StopWatch(ctx)
 }
