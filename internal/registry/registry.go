@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	observability "github.com/goletan/observability/pkg"
+	"github.com/goletan/observability/pkg"
 	"github.com/goletan/services/internal/metrics"
 	"github.com/goletan/services/shared/types"
 	v1 "k8s.io/api/core/v1"
@@ -36,7 +36,7 @@ func NewRegistry(obs *observability.Observability, met *metrics.ServicesMetrics)
 	}
 }
 
-// RegisterService adds a new service to the registry.
+// Register adds a new service to the registry.
 func (r *Registry) Register(service types.Service) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -136,18 +136,18 @@ func (r *Registry) StopAll(ctx context.Context) error {
 	return nil
 }
 
-func (r *Registry) Discover(ctx context.Context, namespace string) ([]types.ServiceEndpoint, error) {
+func (r *Registry) Discover(namespace string) ([]types.ServiceEndpoint, error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	clientset, err := kubernetes.NewForConfig(config)
+	clientSet, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
 
-	services, err := clientset.CoreV1().Services(namespace).List(context.TODO(), metav1.ListOptions{})
+	services, err := clientSet.CoreV1().Services(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -163,8 +163,8 @@ func (r *Registry) Discover(ctx context.Context, namespace string) ([]types.Serv
 	return endpoints, nil
 }
 
-func (r *Registry) DiscoverByTag(ctx context.Context, namespace, tag string) ([]types.ServiceEndpoint, error) {
-	endpoints, err := r.Discover(ctx, namespace)
+func (r *Registry) DiscoverByTag(namespace, tag string) ([]types.ServiceEndpoint, error) {
+	endpoints, err := r.Discover(namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -188,13 +188,13 @@ func (r *Registry) Watch(ctx context.Context, namespace, tag string) (<-chan typ
 		return nil, err
 	}
 
-	clientset, err := kubernetes.NewForConfig(config)
+	clientSet, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
 
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(
-		clientset,
+		clientSet,
 		0, // No resync period
 		informers.WithNamespace(namespace),
 	)

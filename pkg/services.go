@@ -53,18 +53,24 @@ func (s *Services) StopAll(ctx context.Context) error {
 	return s.Registry.StopAll(ctx)
 }
 
-func (s *Services) Discover(ctx context.Context, namespace string) ([]types.ServiceEndpoint, error) {
-	return s.Registry.Discover(ctx, namespace)
+// Discover retrieves a list of service endpoints within a specified namespace.
+// Returns an array of ServiceEndpoint and an error if the discovery process fails.
+func (s *Services) Discover(namespace string) ([]types.ServiceEndpoint, error) {
+	return s.Registry.Discover(namespace)
 }
 
-func (s *Services) DiscoverByTag(ctx context.Context, namespace, tag string) ([]types.ServiceEndpoint, error) {
-	return s.Registry.Discover(ctx, namespace)
+// DiscoverByTag retrieves a list of service endpoints filtered by tag within a specific namespace.
+func (s *Services) DiscoverByTag(namespace, tag string) ([]types.ServiceEndpoint, error) {
+	return s.Registry.DiscoverByTag(namespace, tag)
 }
 
+// Watch subscribes to events for services in the specified namespace and tag.
+// Returns a channel to receive service events and an error if the operation fails.
 func (s *Services) Watch(ctx context.Context, namespace, tag string) (<-chan types.ServiceEvent, error) {
 	return s.Registry.Watch(ctx, namespace, tag)
 }
 
+// StopWatch stops the service event watcher by cancelling the provided context, ensuring no further events are processed.
 func (s *Services) StopWatch(ctx context.Context) error {
 	return s.Registry.StopWatch(ctx)
 }

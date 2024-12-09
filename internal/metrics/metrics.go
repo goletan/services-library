@@ -9,7 +9,7 @@ type ServicesMetrics struct {
 	obs *observability.Observability
 }
 
-// Services Metrics: Track services execution durations.
+// ServiceExecutionDuration Metrics: Track services execution durations.
 var (
 	ServiceExecutionDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
