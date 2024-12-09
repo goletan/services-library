@@ -202,7 +202,7 @@ func (r *Registry) Watch(ctx context.Context, namespace, tag string) (<-chan typ
 	serviceInformer := informerFactory.Core().V1().Services().Informer()
 
 	// Add event handlers for added, updated, and deleted events
-	serviceInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = serviceInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			svc := obj.(*v1.Service)
 			if hasTag(svc, tag) {
@@ -211,7 +211,7 @@ func (r *Registry) Watch(ctx context.Context, namespace, tag string) (<-chan typ
 					Service: types.ServiceEndpoint{
 						Name:    svc.Name,
 						Address: svc.Spec.ClusterIP,
-						Ports:   svc.Spec.Ports,
+						Ports:   convertPorts(svc.Spec.Ports),
 					},
 				}
 			}
@@ -224,7 +224,7 @@ func (r *Registry) Watch(ctx context.Context, namespace, tag string) (<-chan typ
 					Service: types.ServiceEndpoint{
 						Name:    svc.Name,
 						Address: svc.Spec.ClusterIP,
-						Ports:   svc.Spec.Ports,
+						Ports:   convertPorts(svc.Spec.Ports),
 					},
 				}
 			}
@@ -237,12 +237,17 @@ func (r *Registry) Watch(ctx context.Context, namespace, tag string) (<-chan typ
 					Service: types.ServiceEndpoint{
 						Name:    svc.Name,
 						Address: svc.Spec.ClusterIP,
-						Ports:   svc.Spec.Ports,
+						Ports:   convertPorts(svc.Spec.Ports),
 					},
 				}
 			}
 		},
 	})
+
+	if err != nil {
+		r.observability.Logger.Error("Failed to add event handlers for service informer", zap.Error(err))
+		return nil, err
+	}
 
 	go serviceInformer.Run(ctx.Done())
 
@@ -267,4 +272,17 @@ func hasTag(svc *v1.Service, tag string) bool {
 		}
 	}
 	return false
+}
+
+func convertPorts(k8sPorts []v1.ServicePort) []types.ServicePort {
+	var servicePorts []types.ServicePort
+	for _, k8sPort := range k8sPorts {
+		tsPort := types.ServicePort{
+			Name:     k8sPort.Name,
+			Port:     int(k8sPort.Port),
+			Protocol: string(k8sPort.Protocol),
+		}
+		servicePorts = append(servicePorts, tsPort)
+	}
+	return servicePorts
 }
