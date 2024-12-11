@@ -1,12 +1,14 @@
 package types
 
+import "github.com/goletan/observability/shared/logger"
+
 // Service interface that all services must implement.
 type Service interface {
 	Name() string
 	Initialize() error
 	Start() error
 	Stop() error
-	Discover() ([]ServiceEndpoint, error)
+	Discover(log *logger.ZapLogger) ([]ServiceEndpoint, error)
 }
 
 // ServiceEvent represents an event related to a service, such as its addition,

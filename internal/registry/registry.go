@@ -3,6 +3,7 @@ package registry
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -74,8 +75,9 @@ func (r *Registry) InitializeAll(ctx context.Context) error {
 	}
 
 	if len(initErrors) > 0 {
-		r.observability.Logger.Error("One or more services failed to initialize", zap.Errors("errors", initErrors))
-		return initErrors[0] // Return the first error
+		errMsg := aggregateErrors(initErrors)
+		r.observability.Logger.Error("Failed to initialize services", zap.String("errors", errMsg))
+		return fmt.Errorf("initialization errors: %s", errMsg)
 	}
 	return nil
 }
@@ -285,4 +287,13 @@ func convertPorts(k8sPorts []v1.ServicePort) []types.ServicePort {
 		servicePorts = append(servicePorts, tsPort)
 	}
 	return servicePorts
+}
+
+func aggregateErrors(errors []error) string {
+	var errMsg string
+	for _, err := range errors {
+		errMsg += err.Error() + "; "
+	}
+
+	return errMsg
 }
