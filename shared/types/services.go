@@ -1,6 +1,6 @@
 package types
 
-import "github.com/goletan/observability/shared/logger"
+import observability "github.com/goletan/observability/pkg"
 
 // Service interface that all services must implement.
 type Service interface {
@@ -8,7 +8,7 @@ type Service interface {
 	Initialize() error
 	Start() error
 	Stop() error
-	Discover(log *logger.ZapLogger) ([]ServiceEndpoint, error)
+	Discover(obs *observability.Observability) ([]ServiceEndpoint, error)
 }
 
 // ServiceEvent represents an event related to a service, such as its addition,
