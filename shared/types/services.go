@@ -2,8 +2,11 @@ package types
 
 import observability "github.com/goletan/observability/pkg"
 
+type ServiceFactory func(endpoint ServiceEndpoint) Service
+
 // Service interface that all services must implement.
 type Service interface {
+	Build(address string, ports []ServicePort) *ServiceEndpoint
 	Name() string
 	Initialize() error
 	Start() error

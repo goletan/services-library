@@ -2,75 +2,112 @@ package services
 
 import (
 	"context"
-
+	"fmt"
 	observability "github.com/goletan/observability/pkg"
+	"github.com/goletan/services/internal/discovery"
+	"github.com/goletan/services/internal/discovery/strategies"
 	"github.com/goletan/services/internal/metrics"
 	"github.com/goletan/services/internal/registry"
 	"github.com/goletan/services/shared/types"
+	"go.uber.org/zap"
+	"sync"
 )
 
-// Service interface that all services must implement.
-type Service interface {
-	Name() string
-	Initialize() error
-	Start() error
-	Stop() error
-}
-
-// Services struct encapsulates the service registry and metrics.
+// Services encapsulates service discovery, registration, and lifecycle management.
 type Services struct {
-	Registry *registry.Registry
-	Metrics  *metrics.ServicesMetrics
+	discovery       discovery.Strategy
+	registry        *registry.Registry
+	metrics         *metrics.ServicesMetrics
+	factoryRegistry sync.Map
 }
 
-// NewServices creates and returns a new Services instance with observability.
-func NewServices(obs *observability.Observability) *Services {
-	met := metrics.InitMetrics(obs)
-	reg := registry.NewRegistry(obs, met)
-	return &Services{
-		Registry: reg,
-		Metrics:  met,
+// NewServices initializes a new Services instance with strategy-based discovery mechanisms.
+func NewServices(obs *observability.Observability) (*Services, error) {
+	// Load Kubernetes Discovery
+	k8sDiscovery, err := strategies.NewKubernetesDiscovery(obs.Logger)
+	if err != nil {
+		obs.Logger.Warn("Kubernetes discovery could not be initialized", zap.Error(err))
 	}
+
+	// Load DNS Discovery
+	dnsDiscovery, err := strategies.NewDNSDiscovery(obs.Logger)
+	if err != nil {
+		obs.Logger.Warn("DNS discovery could not be initialized", zap.Error(err))
+	}
+
+	// Aggregate all strategies into a composite discovery
+	var discoveryStrategies []discovery.Strategy
+	if k8sDiscovery != nil {
+		discoveryStrategies = append(discoveryStrategies, k8sDiscovery)
+	}
+	if dnsDiscovery != nil {
+		discoveryStrategies = append(discoveryStrategies, dnsDiscovery)
+	}
+
+	if len(discoveryStrategies) == 0 {
+		return nil, fmt.Errorf("no valid discovery strategies available")
+	}
+
+	compositeDiscovery := discovery.NewCompositeDiscovery(
+		obs.Logger,
+		discoveryStrategies...,
+	)
+
+	// Initialize registry and metrics
+	newMetrics := metrics.InitMetrics(obs)
+	newRegistry := registry.NewRegistry(obs, newMetrics)
+
+	return &Services{
+		discovery: compositeDiscovery,
+		registry:  newRegistry,
+		metrics:   newMetrics,
+	}, nil
 }
 
-// Register a service in the Registry
+// RegisterFactory registers a factory for dynamically creating services.
+func (s *Services) RegisterFactory(name string, factory types.ServiceFactory) {
+	s.factoryRegistry.Store(name, factory)
+}
+
+// CreateService dynamically creates a Service using a registered factory.
+func (s *Services) CreateService(endpoint types.ServiceEndpoint) (types.Service, error) {
+	factoryInterface, ok := s.factoryRegistry.Load(endpoint.Name)
+	if !ok {
+		return nil, fmt.Errorf("no factory registered for service: %s", endpoint.Name)
+	}
+	factory, ok := factoryInterface.(types.ServiceFactory)
+	if !ok {
+		return nil, fmt.Errorf("invalid factory for service: %s", endpoint.Name)
+	}
+	return factory(endpoint), nil
+}
+
+// Discover discovers all services in a namespace.
+func (s *Services) Discover(ctx context.Context, namespace string) ([]types.ServiceEndpoint, error) {
+	return s.discovery.Discover(ctx, namespace)
+}
+
+// Watch discovers all services in a namespace.
+func (s *Services) Watch(ctx context.Context, namespace string) (<-chan types.ServiceEvent, error) {
+	return s.discovery.Watch(ctx, namespace)
+}
+
+// Register registers a service in the registry.
 func (s *Services) Register(service types.Service) error {
-	return s.Registry.Register(service)
+	return s.registry.Register(service)
 }
 
-// InitializeAll initializes all services via registry.
+// InitializeAll initializes all registered services in the registry.
 func (s *Services) InitializeAll(ctx context.Context) error {
-	return s.Registry.InitializeAll(ctx)
+	return s.registry.InitializeAll(ctx)
 }
 
-// StartAll starts all services via registry.
+// StartAll starts all registered services in the registry.
 func (s *Services) StartAll(ctx context.Context) error {
-	return s.Registry.StartAll(ctx)
+	return s.registry.StartAll(ctx)
 }
 
-// StopAll stops all services via registry.
+// StopAll stops all registered services in the registry.
 func (s *Services) StopAll(ctx context.Context) error {
-	return s.Registry.StopAll(ctx)
-}
-
-// Discover retrieves a list of service endpoints within a specified namespace.
-// Returns an array of ServiceEndpoint and an error if the discovery process fails.
-func (s *Services) Discover(namespace string) ([]types.ServiceEndpoint, error) {
-	return s.Registry.Discover(namespace)
-}
-
-// DiscoverByTag retrieves a list of service endpoints filtered by tag within a specific namespace.
-func (s *Services) DiscoverByTag(namespace, tag string) ([]types.ServiceEndpoint, error) {
-	return s.Registry.DiscoverByTag(namespace, tag)
-}
-
-// Watch subscribes to events for services in the specified namespace and tag.
-// Returns a channel to receive service events and an error if the operation fails.
-func (s *Services) Watch(ctx context.Context, namespace, tag string) (<-chan types.ServiceEvent, error) {
-	return s.Registry.Watch(ctx, namespace, tag)
-}
-
-// StopWatch stops the service event watcher by cancelling the provided context, ensuring no further events are processed.
-func (s *Services) StopWatch(ctx context.Context) error {
-	return s.Registry.StopWatch(ctx)
+	return s.registry.StopAll(ctx)
 }
