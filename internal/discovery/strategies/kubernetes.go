@@ -3,8 +3,8 @@ package strategies
 import (
 	"context"
 	"fmt"
-	"github.com/goletan/logger/pkg"
-	"github.com/goletan/services/shared/types"
+	"github.com/goletan/logger-library/pkg"
+	"github.com/goletan/services-library/shared/types"
 	"go.uber.org/zap"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

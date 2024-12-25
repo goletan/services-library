@@ -3,7 +3,7 @@ package strategies
 import (
 	"context"
 	logger "github.com/goletan/logger-library/pkg"
-	"github.com/goletan/services/shared/types"
+	"github.com/goletan/services-library/shared/types"
 	"go.uber.org/zap"
 	"net"
 	"time"

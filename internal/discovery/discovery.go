@@ -2,7 +2,7 @@ package discovery
 
 import (
 	"context"
-	"github.com/goletan/services/shared/types"
+	"github.com/goletan/services-library/shared/types"
 )
 
 // Strategy defines the interface for service discovery mechanisms.

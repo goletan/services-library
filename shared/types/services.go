@@ -33,7 +33,7 @@ type ServiceEndpoint struct {
 	Address string        // The IP or hostname of the service.
 	Ports   []ServicePort // List of exposed ports and their purposes.
 	Version string        // Optional: version of the service for future use (e.g., "v1.0").
-	Tags    []string      // Optional: tags for categorization or discovery filters (e.g., ["grpc", "core-service"]).
+	Tags    []string      // Optional: tags for categorization or discovery filters (e.g., ["grpc", "kernel-service"]).
 }
 
 // ServicePort represents the details of a single port.

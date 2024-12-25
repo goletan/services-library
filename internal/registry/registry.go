@@ -3,9 +3,9 @@ package registry
 import (
 	"context"
 	"fmt"
-	"github.com/goletan/observability/pkg"
-	"github.com/goletan/services/internal/metrics"
-	"github.com/goletan/services/shared/types"
+	"github.com/goletan/observability-library/pkg"
+	"github.com/goletan/services-library/internal/metrics"
+	"github.com/goletan/services-library/shared/types"
 	"go.uber.org/zap"
 	"sync"
 )
