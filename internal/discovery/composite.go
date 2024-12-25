@@ -3,7 +3,7 @@ package discovery
 import (
 	"context"
 	"fmt"
-	logger "github.com/goletan/logger/pkg"
+	logger "github.com/goletan/logger-library/pkg"
 	"github.com/goletan/services/shared/types"
 	"go.uber.org/zap"
 	"sync"
@@ -45,7 +45,7 @@ func (cd *CompositeDiscovery) Discover(ctx context.Context, namespace string) ([
 }
 
 func (cd *CompositeDiscovery) Watch(ctx context.Context, namespace string) (<-chan types.ServiceEvent, error) {
-	// Single aggregated channel for service events
+	// Single aggregated channel for service events-service
 	aggregatedEvents := make(chan types.ServiceEvent)
 
 	// WaitGroup to synchronize the goroutines
@@ -54,7 +54,7 @@ func (cd *CompositeDiscovery) Watch(ctx context.Context, namespace string) (<-ch
 	// Context to handle cancellations for individual strategies
 	watchCtx, cancel := context.WithCancel(ctx)
 
-	// Start a goroutine to collect events from each strategy
+	// Start a goroutine to collect events-service from each strategy
 	for _, strategy := range cd.strategies {
 		wg.Add(1)
 		go func(strategy Strategy) {
@@ -67,7 +67,7 @@ func (cd *CompositeDiscovery) Watch(ctx context.Context, namespace string) (<-ch
 				return
 			}
 
-			// Forward events to the aggregated channel
+			// Forward events-service to the aggregated channel
 			for event := range eventCh {
 				select {
 				case aggregatedEvents <- event:

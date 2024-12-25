@@ -2,7 +2,7 @@ package strategies
 
 import (
 	"context"
-	logger "github.com/goletan/logger/pkg"
+	logger "github.com/goletan/logger-library/pkg"
 	"github.com/goletan/services/shared/types"
 	"go.uber.org/zap"
 	"net"
@@ -18,7 +18,7 @@ func NewDNSDiscovery(logger *logger.ZapLogger) (*DNSDiscovery, error) {
 }
 
 func (d *DNSDiscovery) Discover(ctx context.Context, namespace string) ([]types.ServiceEndpoint, error) {
-	records, err := net.LookupTXT(namespace + ".services.local")
+	records, err := net.LookupTXT(namespace + ".services-library.local")
 	if err != nil {
 		d.logger.Warn("DNS lookup failed", zap.Error(err))
 		return nil, err
@@ -33,7 +33,7 @@ func (d *DNSDiscovery) Discover(ctx context.Context, namespace string) ([]types.
 }
 
 func (d *DNSDiscovery) Watch(ctx context.Context, namespace string) (<-chan types.ServiceEvent, error) {
-	// Create a channel to send updates of service events
+	// Create a channel to send updates of service events-service
 	serviceEventCh := make(chan types.ServiceEvent)
 
 	// Start a goroutine to watch for DNS changes
@@ -53,7 +53,7 @@ func (d *DNSDiscovery) Watch(ctx context.Context, namespace string) (<-chan type
 				return
 			case <-ticker.C:
 				// Perform DNS lookup
-				records, err := net.LookupTXT(namespace + ".services.local")
+				records, err := net.LookupTXT(namespace + ".services-library.local")
 				if err != nil {
 					d.logger.Warn("DNS lookup failed", zap.Error(err))
 					continue

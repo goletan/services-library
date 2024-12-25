@@ -1,4 +1,4 @@
-module github.com/goletan/services
+module github.com/goletan/services-library
 
 go 1.23
 

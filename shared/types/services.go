@@ -1,10 +1,10 @@
 package types
 
-import observability "github.com/goletan/observability/pkg"
+import observability "github.com/goletan/observability-library/pkg"
 
 type ServiceFactory func(endpoint ServiceEndpoint) Service
 
-// Service interface that all services must implement.
+// Service interface that all services-library must implement.
 type Service interface {
 	Build(address string, ports []ServicePort) *ServiceEndpoint
 	Name() string
@@ -33,7 +33,7 @@ type ServiceEndpoint struct {
 	Address string        // The IP or hostname of the service.
 	Ports   []ServicePort // List of exposed ports and their purposes.
 	Version string        // Optional: version of the service for future use (e.g., "v1.0").
-	Tags    []string      // Optional: tags for categorization or discovery filters (e.g., ["grpc", "core"]).
+	Tags    []string      // Optional: tags for categorization or discovery filters (e.g., ["grpc", "core-service"]).
 }
 
 // ServicePort represents the details of a single port.

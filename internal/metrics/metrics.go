@@ -9,14 +9,14 @@ type ServicesMetrics struct {
 	obs *observability.Observability
 }
 
-// ServiceExecutionDuration Metrics: Track services execution durations.
+// ServiceExecutionDuration Metrics: Track services-library execution durations.
 var (
 	ServiceExecutionDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: "goletan",
-			Subsystem: "services",
+			Subsystem: "services-library",
 			Name:      "execution_duration_seconds",
-			Help:      "Tracks the duration of services execution.",
+			Help:      "Tracks the duration of services-library execution.",
 		},
 		[]string{"service", "operation"},
 	)

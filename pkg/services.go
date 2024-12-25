@@ -3,7 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
-	observability "github.com/goletan/observability/pkg"
+	observability "github.com/goletan/observability-library/pkg"
 	"github.com/goletan/services/internal/discovery"
 	"github.com/goletan/services/internal/discovery/strategies"
 	"github.com/goletan/services/internal/metrics"
@@ -64,7 +64,7 @@ func NewServices(obs *observability.Observability) (*Services, error) {
 	}, nil
 }
 
-// RegisterFactory registers a factory for dynamically creating services.
+// RegisterFactory registers a factory for dynamically creating services-library.
 func (s *Services) RegisterFactory(name string, factory types.ServiceFactory) {
 	s.factoryRegistry.Store(name, factory)
 }
@@ -82,12 +82,12 @@ func (s *Services) CreateService(endpoint types.ServiceEndpoint) (types.Service,
 	return factory(endpoint), nil
 }
 
-// Discover discovers all services in a namespace.
+// Discover discovers all services-library in a namespace.
 func (s *Services) Discover(ctx context.Context, namespace string) ([]types.ServiceEndpoint, error) {
 	return s.discovery.Discover(ctx, namespace)
 }
 
-// Watch discovers all services in a namespace.
+// Watch discovers all services-library in a namespace.
 func (s *Services) Watch(ctx context.Context, namespace string) (<-chan types.ServiceEvent, error) {
 	return s.discovery.Watch(ctx, namespace)
 }
@@ -97,17 +97,17 @@ func (s *Services) Register(service types.Service) error {
 	return s.registry.Register(service)
 }
 
-// InitializeAll initializes all registered services in the registry.
+// InitializeAll initializes all registered services-library in the registry.
 func (s *Services) InitializeAll(ctx context.Context) error {
 	return s.registry.InitializeAll(ctx)
 }
 
-// StartAll starts all registered services in the registry.
+// StartAll starts all registered services-library in the registry.
 func (s *Services) StartAll(ctx context.Context) error {
 	return s.registry.StartAll(ctx)
 }
 
-// StopAll stops all registered services in the registry.
+// StopAll stops all registered services-library in the registry.
 func (s *Services) StopAll(ctx context.Context) error {
 	return s.registry.StopAll(ctx)
 }

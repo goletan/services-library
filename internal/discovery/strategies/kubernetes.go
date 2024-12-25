@@ -98,7 +98,7 @@ func (kd *KubernetesDiscovery) Watch(ctx context.Context, namespace string) (<-c
 
 	serviceInformer := informerFactory.Core().V1().Services().Informer()
 
-	// Add event handlers for added, updated, and deleted events
+	// Add event handlers for added, updated, and deleted events-service
 	_, err = serviceInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			svc := obj.(*v1.Service)
