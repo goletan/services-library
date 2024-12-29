@@ -13,12 +13,16 @@ type DNSDiscovery struct {
 	logger *logger.ZapLogger
 }
 
-func NewDNSDiscovery(logger *logger.ZapLogger) (*DNSDiscovery, error) {
-	return &DNSDiscovery{logger: logger}, nil
+func NewDNSStrategy(logger *logger.ZapLogger) *DNSDiscovery {
+	return &DNSDiscovery{logger: logger}
+}
+
+func (d *DNSDiscovery) Name() string {
+	return "dns"
 }
 
 func (d *DNSDiscovery) Discover(ctx context.Context, namespace string) ([]types.ServiceEndpoint, error) {
-	records, err := net.LookupTXT(namespace + ".services-library.local")
+	records, err := net.LookupTXT(namespace)
 	if err != nil {
 		d.logger.Warn("DNS lookup failed", zap.Error(err))
 		return nil, err
@@ -53,7 +57,7 @@ func (d *DNSDiscovery) Watch(ctx context.Context, namespace string) (<-chan type
 				return
 			case <-ticker.C:
 				// Perform DNS lookup
-				records, err := net.LookupTXT(namespace + ".services-library.local")
+				records, err := net.LookupTXT(namespace)
 				if err != nil {
 					d.logger.Warn("DNS lookup failed", zap.Error(err))
 					continue

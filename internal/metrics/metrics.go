@@ -14,7 +14,7 @@ var (
 	ServiceExecutionDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: "goletan",
-			Subsystem: "services-library",
+			Subsystem: "services_library",
 			Name:      "execution_duration_seconds",
 			Help:      "Tracks the duration of services-library execution.",
 		},

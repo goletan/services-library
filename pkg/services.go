@@ -9,7 +9,6 @@ import (
 	"github.com/goletan/services-library/internal/metrics"
 	"github.com/goletan/services-library/internal/registry"
 	"github.com/goletan/services-library/shared/types"
-	"go.uber.org/zap"
 	"sync"
 )
 
@@ -23,29 +22,10 @@ type Services struct {
 
 // NewServices initializes a new Services instance with strategy-based discovery mechanisms.
 func NewServices(obs *observability.Observability) (*Services, error) {
-	// Load Kubernetes Discovery
-	k8sDiscovery, err := strategies.NewKubernetesDiscovery(obs.Logger)
-	if err != nil {
-		obs.Logger.Warn("Kubernetes discovery could not be initialized", zap.Error(err))
-	}
-
-	// Load DNS Discovery
-	dnsDiscovery, err := strategies.NewDNSDiscovery(obs.Logger)
-	if err != nil {
-		obs.Logger.Warn("DNS discovery could not be initialized", zap.Error(err))
-	}
-
-	// Aggregate all strategies into a composite discovery
-	var discoveryStrategies []discovery.Strategy
-	if k8sDiscovery != nil {
-		discoveryStrategies = append(discoveryStrategies, k8sDiscovery)
-	}
-	if dnsDiscovery != nil {
-		discoveryStrategies = append(discoveryStrategies, dnsDiscovery)
-	}
-
-	if len(discoveryStrategies) == 0 {
-		return nil, fmt.Errorf("no valid discovery strategies available")
+	discoveryStrategies := []discovery.Strategy{
+		strategies.NewKubernetesStrategy(obs.Logger),
+		strategies.NewDockerSwarmStrategy(obs.Logger),
+		strategies.NewDNSStrategy(obs.Logger),
 	}
 
 	compositeDiscovery := discovery.NewCompositeDiscovery(

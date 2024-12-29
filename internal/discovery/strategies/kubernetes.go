@@ -15,53 +15,46 @@ import (
 )
 
 type KubernetesDiscovery struct {
-	client kubernetes.Interface
 	logger *logger.ZapLogger
 }
 
-func NewKubernetesDiscovery(log *logger.ZapLogger) (*KubernetesDiscovery, error) {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		log.Error("Failed to create kubernetes client", zap.Error(err))
-		return nil, err
-	}
+func NewKubernetesStrategy(log *logger.ZapLogger) *KubernetesDiscovery {
+	return &KubernetesDiscovery{logger: log}
+}
 
-	clientSet, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		log.Error("Failed to create kubernetes client", zap.Error(err))
-		return nil, err
-	}
-
-	return &KubernetesDiscovery{
-		client: clientSet,
-		logger: log,
-	}, nil
+func (kd *KubernetesDiscovery) Name() string {
+	return "kubernetes"
 }
 
 func (kd *KubernetesDiscovery) Discover(ctx context.Context, namespace string) ([]types.ServiceEndpoint, error) {
+	kd.logger.Info("Attempting Kubernetes discovery", zap.String("namespace", namespace))
+
 	if deadline, ok := ctx.Deadline(); !ok || deadline.IsZero() {
 		return nil, fmt.Errorf("context must have a timeout or deadline")
 	}
 
 	config, err := rest.InClusterConfig()
 	if err != nil {
+		kd.logger.Warn("Kubernetes in-cluster configuration unavailable, skipping", zap.Error(err))
 		return nil, err
 	}
 
 	clientSet, err := kubernetes.NewForConfig(config)
 	if err != nil {
+		kd.logger.Warn("Failed to create Kubernetes client", zap.Error(err))
 		return nil, err
 	}
 
 	listOptions := metav1.ListOptions{
-		LabelSelector: kd.getLabelSelector(),
+		//LabelSelector: kd.getLabelSelector(),
 	}
 	services, err := clientSet.CoreV1().Services(namespace).List(ctx, listOptions)
 	if err != nil {
-		return nil, err
+		kd.logger.Warn("Failed to list services in namespace", zap.String("namespace", namespace), zap.Error(err))
+		return nil, nil
 	}
 
-	var aggregatedEndpoints []types.ServiceEndpoint
+	aggregatedEndpoints := make([]types.ServiceEndpoint, len(services.Items))
 	for _, svc := range services.Items {
 		endpoint := types.ServiceEndpoint{
 			Name:    svc.Name,

@@ -21,27 +21,30 @@ func NewCompositeDiscovery(log *logger.ZapLogger, strategies ...Strategy) *Compo
 	}
 }
 
+func (cd *CompositeDiscovery) Name() string {
+	return "composite"
+}
+
 func (cd *CompositeDiscovery) Discover(ctx context.Context, namespace string) ([]types.ServiceEndpoint, error) {
-	var (
-		aggregatedEndpoints []types.ServiceEndpoint
-		aggregatedErrors    []error
-	)
+	var discovered []types.ServiceEndpoint
+	var strategyErrors []error
 
 	for _, strategy := range cd.strategies {
+		cd.logger.Info("Attempting service discovery using strategy", zap.String("strategy", strategy.Name()))
 		endpoints, err := strategy.Discover(ctx, namespace)
 		if err != nil {
-			cd.logger.Warn("Discovery strategy failed", zap.Error(err))
-			aggregatedErrors = append(aggregatedErrors, err)
-			continue
+			cd.logger.Warn("Discovery strategy failed", zap.String("strategy", strategy.Name()), zap.Error(err))
+			strategyErrors = append(strategyErrors, err)
+		} else {
+			discovered = append(discovered, endpoints...)
 		}
-		aggregatedEndpoints = append(aggregatedEndpoints, endpoints...)
 	}
 
-	if len(aggregatedErrors) > 0 {
-		return aggregatedEndpoints, fmt.Errorf("some strategies failed: %v", aggregatedErrors)
+	if len(discovered) == 0 {
+		return nil, fmt.Errorf("no services discovered in namespace: %s, errors: %v", namespace, strategyErrors)
 	}
 
-	return aggregatedEndpoints, nil
+	return discovered, nil
 }
 
 func (cd *CompositeDiscovery) Watch(ctx context.Context, namespace string) (<-chan types.ServiceEvent, error) {

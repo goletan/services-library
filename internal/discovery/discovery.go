@@ -9,4 +9,5 @@ import (
 type Strategy interface {
 	Discover(ctx context.Context, namespace string) ([]types.ServiceEndpoint, error)
 	Watch(ctx context.Context, namespace string) (<-chan types.ServiceEvent, error)
+	Name() string
 }
