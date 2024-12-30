@@ -34,6 +34,11 @@ func (d *DockerSwarmStrategy) Discover(ctx context.Context, namespace string) ([
 
 	var targetNetworkID string
 	networks, err := cli.NetworkList(ctx, network.ListOptions{})
+	if err != nil {
+		d.logger.Error("Failed to list Docker Swarm networks", zap.Error(err))
+		return nil, err
+	}
+
 	for _, net := range networks {
 		d.logger.Info("Network:", zap.String("name", net.Name), zap.String("id", net.ID))
 		if net.Name == namespace {
@@ -57,10 +62,8 @@ func (d *DockerSwarmStrategy) Discover(ctx context.Context, namespace string) ([
 	// Extract endpoints from services
 	var endpoints []types.ServiceEndpoint
 	for _, service := range services {
-		d.logger.Info("Service:", zap.String("name", service.Spec.Name))
 		for _, vip := range service.Endpoint.VirtualIPs {
 			address := strings.Split(vip.Addr, "/")[0]
-			d.logger.Info("VIP:", zap.String("addr", address), zap.String("network", vip.NetworkID))
 			if vip.NetworkID == targetNetworkID {
 				endpoints = append(endpoints, types.ServiceEndpoint{
 					Name:    service.Spec.Name,
