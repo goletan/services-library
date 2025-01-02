@@ -2,7 +2,6 @@ package strategies
 
 import (
 	"context"
-	"fmt"
 	"github.com/goletan/logger-library/pkg"
 	"github.com/goletan/services-library/shared/types"
 	"go.uber.org/zap"
@@ -26,52 +25,45 @@ func (kd *KubernetesDiscovery) Name() string {
 	return "kubernetes"
 }
 
-func (kd *KubernetesDiscovery) Discover(ctx context.Context, namespace string) ([]types.ServiceEndpoint, error) {
-	kd.logger.Info("Attempting Kubernetes discovery", zap.String("namespace", namespace))
-
-	if deadline, ok := ctx.Deadline(); !ok || deadline.IsZero() {
-		return nil, fmt.Errorf("context must have a timeout or deadline")
-	}
+func (kd *KubernetesDiscovery) Discover(ctx context.Context, namespace string, filter *types.Filter) ([]types.ServiceEndpoint, error) {
+	kd.logger.Info("Discovering services in Kubernetes", zap.String("namespace", namespace))
 
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		kd.logger.Warn("Kubernetes in-cluster configuration unavailable, skipping", zap.Error(err))
 		return nil, err
 	}
 
 	clientSet, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		kd.logger.Warn("Failed to create Kubernetes client", zap.Error(err))
 		return nil, err
 	}
 
-	listOptions := metav1.ListOptions{
-		//LabelSelector: kd.getLabelSelector(),
-	}
-	services, err := clientSet.CoreV1().Services(namespace).List(ctx, listOptions)
+	services, err := clientSet.CoreV1().Services(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		kd.logger.Warn("Failed to list services in namespace", zap.String("namespace", namespace), zap.Error(err))
-		return nil, nil
+		return nil, err
 	}
 
-	aggregatedEndpoints := make([]types.ServiceEndpoint, len(services.Items))
+	var endpoints []types.ServiceEndpoint
 	for _, svc := range services.Items {
 		endpoint := types.ServiceEndpoint{
 			Name:    svc.Name,
-			Address: normalizeClusterIP(svc.Spec.ClusterIP),
-			Ports:   convertPorts(svc.Spec.Ports),
+			Address: svc.Spec.ClusterIP,
+			Ports:   ConvertPorts(svc.Spec.Ports),
+			Tags:    svc.Labels,
 		}
-		if err := validateEndpoint(endpoint); err != nil {
-			kd.logger.Warn("Invalid service metadata", zap.Error(err))
+
+		// Apply filters
+		if !MatchTags(endpoint.Tags, filter.Tags) {
 			continue
 		}
-		aggregatedEndpoints = append(aggregatedEndpoints, endpoint)
+
+		endpoints = append(endpoints, endpoint)
 	}
 
-	return aggregatedEndpoints, nil
+	return endpoints, nil
 }
 
-func (kd *KubernetesDiscovery) Watch(ctx context.Context, namespace string) (<-chan types.ServiceEvent, error) {
+func (kd *KubernetesDiscovery) Watch(ctx context.Context, namespace string, filter *types.Filter) (<-chan types.ServiceEvent, error) {
 	eventsChan := make(chan types.ServiceEvent)
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -85,96 +77,60 @@ func (kd *KubernetesDiscovery) Watch(ctx context.Context, namespace string) (<-c
 
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(
 		clientSet,
-		0, // No re-sync period
+		0,
 		informers.WithNamespace(namespace),
 	)
 
 	serviceInformer := informerFactory.Core().V1().Services().Informer()
 
-	// Add event handlers for added, updated, and deleted events-service
 	_, err = serviceInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			svc := obj.(*v1.Service)
-			eventsChan <- types.ServiceEvent{
-				Type: "ADDED",
-				Service: types.ServiceEndpoint{
-					Name:    svc.Name,
-					Address: svc.Spec.ClusterIP,
-					Ports:   convertPorts(svc.Spec.Ports),
-				},
+			endpoint := types.ServiceEndpoint{
+				Name:    svc.Name,
+				Address: svc.Spec.ClusterIP,
+				Ports:   ConvertPorts(svc.Spec.Ports),
+				Tags:    svc.Labels,
+			}
+
+			if MatchTags(endpoint.Tags, filter.Tags) {
+				eventsChan <- types.ServiceEvent{Type: "ADDED", Service: endpoint}
 			}
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(_, newObj interface{}) {
 			svc := newObj.(*v1.Service)
-			eventsChan <- types.ServiceEvent{
-				Type: "MODIFIED",
-				Service: types.ServiceEndpoint{
-					Name:    svc.Name,
-					Address: svc.Spec.ClusterIP,
-					Ports:   convertPorts(svc.Spec.Ports),
-				},
+			endpoint := types.ServiceEndpoint{
+				Name:    svc.Name,
+				Address: svc.Spec.ClusterIP,
+				Ports:   ConvertPorts(svc.Spec.Ports),
+				Tags:    svc.Labels,
+			}
+
+			if MatchTags(endpoint.Tags, filter.Tags) {
+				eventsChan <- types.ServiceEvent{Type: "MODIFIED", Service: endpoint}
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
 			svc := obj.(*v1.Service)
-			eventsChan <- types.ServiceEvent{
-				Type: "DELETED",
-				Service: types.ServiceEndpoint{
-					Name:    svc.Name,
-					Address: svc.Spec.ClusterIP,
-					Ports:   convertPorts(svc.Spec.Ports),
-				},
+			endpoint := types.ServiceEndpoint{
+				Name:    svc.Name,
+				Address: svc.Spec.ClusterIP,
+				Ports:   ConvertPorts(svc.Spec.Ports),
+				Tags:    svc.Labels,
 			}
+
+			eventsChan <- types.ServiceEvent{Type: "DELETED", Service: endpoint}
 		},
 	})
 
 	if err != nil {
-		kd.logger.Error("Failed to add event handlers for service informer", zap.Error(err))
 		return nil, err
 	}
 
 	go func() {
 		serviceInformer.Run(ctx.Done())
-		defer close(eventsChan)
+		close(eventsChan)
 	}()
 
 	return eventsChan, nil
-}
-
-func normalizeClusterIP(ip string) string {
-	if ip == "None" {
-		return ""
-	}
-	return ip
-}
-
-func (kd *KubernetesDiscovery) getLabelSelector() string {
-	return "app=discovery"
-}
-
-func convertPorts(k8sPorts []v1.ServicePort) []types.ServicePort {
-	var servicePorts []types.ServicePort
-	for _, k8sPort := range k8sPorts {
-		tsPort := types.ServicePort{
-			Name:     k8sPort.Name,
-			Port:     int(k8sPort.Port),
-			Protocol: string(k8sPort.Protocol),
-		}
-		servicePorts = append(servicePorts, tsPort)
-	}
-	return servicePorts
-}
-
-// validateEndpoint checks that all required fields are populated.
-func validateEndpoint(endpoint types.ServiceEndpoint) error {
-	if endpoint.Name == "" {
-		return fmt.Errorf("missing name")
-	}
-	if endpoint.Address == "" {
-		return fmt.Errorf("missing address")
-	}
-	if len(endpoint.Ports) == 0 {
-		return fmt.Errorf("missing ports")
-	}
-	return nil
 }

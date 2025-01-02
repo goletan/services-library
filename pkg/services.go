@@ -14,7 +14,7 @@ import (
 
 // Services encapsulates service discovery, registration, and lifecycle management.
 type Services struct {
-	discovery       discovery.Strategy
+	discovery       *discovery.CompositeDiscovery
 	registry        *registry.Registry
 	metrics         *metrics.ServicesMetrics
 	factoryRegistry sync.Map
@@ -22,7 +22,8 @@ type Services struct {
 
 // NewServices initializes a new Services instance with strategy-based discovery mechanisms.
 func NewServices(obs *observability.Observability) (*Services, error) {
-	discoveryStrategies := []discovery.Strategy{
+
+	discoveryStrategies := []types.Strategy{
 		strategies.NewKubernetesStrategy(obs.Logger),
 		strategies.NewDockerSwarmStrategy(obs.Logger),
 		strategies.NewDNSStrategy(obs.Logger),
@@ -63,13 +64,13 @@ func (s *Services) CreateService(endpoint types.ServiceEndpoint) (types.Service,
 }
 
 // Discover discovers all services-library in a namespace.
-func (s *Services) Discover(ctx context.Context, namespace string) ([]types.ServiceEndpoint, error) {
-	return s.discovery.Discover(ctx, namespace)
+func (s *Services) Discover(ctx context.Context, namespace string, filter *types.Filter) ([]types.ServiceEndpoint, error) {
+	return s.discovery.Discover(ctx, namespace, filter)
 }
 
 // Watch discovers all services-library in a namespace.
-func (s *Services) Watch(ctx context.Context, namespace string) (<-chan types.ServiceEvent, error) {
-	return s.discovery.Watch(ctx, namespace)
+func (s *Services) Watch(ctx context.Context, namespace string, filter *types.Filter) (<-chan types.ServiceEvent, error) {
+	return s.discovery.Watch(ctx, namespace, filter)
 }
 
 // Register registers a service in the registry.
