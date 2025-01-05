@@ -11,19 +11,23 @@ import (
 )
 
 type DNSDiscovery struct {
-	logger *logger.ZapLogger
+	logger    *logger.ZapLogger
+	namespace string
 }
 
-func NewDNSStrategy(logger *logger.ZapLogger) *DNSDiscovery {
-	return &DNSDiscovery{logger: logger}
+func NewDNSStrategy(logger *logger.ZapLogger, namespace string) *DNSDiscovery {
+	return &DNSDiscovery{
+		logger:    logger,
+		namespace: namespace,
+	}
 }
 
 func (d *DNSDiscovery) Name() string {
 	return "dns"
 }
 
-func (d *DNSDiscovery) Discover(ctx context.Context, namespace string, filter *types.Filter) ([]types.ServiceEndpoint, error) {
-	records, err := net.LookupTXT(namespace)
+func (d *DNSDiscovery) Discover(ctx context.Context, filter *types.Filter) ([]types.ServiceEndpoint, error) {
+	records, err := net.LookupTXT(d.namespace)
 	if err != nil {
 		d.logger.Warn("DNS lookup failed", zap.Error(err))
 		return nil, err
@@ -44,7 +48,7 @@ func (d *DNSDiscovery) Discover(ctx context.Context, namespace string, filter *t
 	return endpoints, nil
 }
 
-func (d *DNSDiscovery) Watch(ctx context.Context, namespace string, filter *types.Filter) (<-chan types.ServiceEvent, error) {
+func (d *DNSDiscovery) Watch(ctx context.Context, filter *types.Filter) (<-chan types.ServiceEvent, error) {
 	serviceEventCh := make(chan types.ServiceEvent)
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
@@ -59,7 +63,7 @@ func (d *DNSDiscovery) Watch(ctx context.Context, namespace string, filter *type
 				d.logger.Info("Stopping DNS discovery watcher...")
 				return
 			case <-ticker.C:
-				records, err := net.LookupTXT(namespace)
+				records, err := net.LookupTXT(d.namespace)
 				if err != nil {
 					d.logger.Warn("DNS lookup failed", zap.Error(err))
 					continue

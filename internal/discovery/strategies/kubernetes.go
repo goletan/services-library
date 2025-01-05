@@ -14,37 +14,45 @@ import (
 )
 
 type KubernetesDiscovery struct {
-	logger *logger.ZapLogger
+	logger    *logger.ZapLogger
+	namespace string
 }
 
-func NewKubernetesStrategy(log *logger.ZapLogger) *KubernetesDiscovery {
-	return &KubernetesDiscovery{logger: log}
+func NewKubernetesStrategy(log *logger.ZapLogger, namespace string) *KubernetesDiscovery {
+	return &KubernetesDiscovery{
+		logger:    log,
+		namespace: namespace,
+	}
 }
 
 func (kd *KubernetesDiscovery) Name() string {
 	return "kubernetes"
 }
 
-func (kd *KubernetesDiscovery) Discover(ctx context.Context, namespace string, filter *types.Filter) ([]types.ServiceEndpoint, error) {
-	kd.logger.Info("Discovering services in Kubernetes", zap.String("namespace", namespace))
+func (kd *KubernetesDiscovery) Discover(ctx context.Context, filter *types.Filter) ([]types.ServiceEndpoint, error) {
+	kd.logger.Info("Discovering services in Kubernetes", zap.String("namespace", kd.namespace))
 
 	config, err := rest.InClusterConfig()
 	if err != nil {
+		kd.logger.Error("Failed to load in-cluster config", zap.Error(err))
 		return nil, err
 	}
 
 	clientSet, err := kubernetes.NewForConfig(config)
 	if err != nil {
+		kd.logger.Error("Failed to load new config", zap.Error(err))
 		return nil, err
 	}
 
-	services, err := clientSet.CoreV1().Services(namespace).List(ctx, metav1.ListOptions{})
+	services, err := clientSet.CoreV1().Services(kd.namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
+		kd.logger.Error("Failed to list services", zap.Error(err))
 		return nil, err
 	}
 
 	var endpoints []types.ServiceEndpoint
 	for _, svc := range services.Items {
+		kd.logger.Info("Fetched service from Kubernetes", zap.String("name", svc.Name), zap.Any("labels", svc.Labels))
 		endpoint := types.ServiceEndpoint{
 			Name:    svc.Name,
 			Address: svc.Spec.ClusterIP,
@@ -63,7 +71,7 @@ func (kd *KubernetesDiscovery) Discover(ctx context.Context, namespace string, f
 	return endpoints, nil
 }
 
-func (kd *KubernetesDiscovery) Watch(ctx context.Context, namespace string, filter *types.Filter) (<-chan types.ServiceEvent, error) {
+func (kd *KubernetesDiscovery) Watch(ctx context.Context, filter *types.Filter) (<-chan types.ServiceEvent, error) {
 	eventsChan := make(chan types.ServiceEvent)
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -78,7 +86,7 @@ func (kd *KubernetesDiscovery) Watch(ctx context.Context, namespace string, filt
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(
 		clientSet,
 		0,
-		informers.WithNamespace(namespace),
+		informers.WithNamespace(kd.namespace),
 	)
 
 	serviceInformer := informerFactory.Core().V1().Services().Informer()

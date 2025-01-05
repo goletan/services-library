@@ -49,7 +49,7 @@ type Filter struct {
 
 // Strategy defines the interface for service discovery mechanisms.
 type Strategy interface {
-	Discover(ctx context.Context, namespace string, filter *Filter) ([]ServiceEndpoint, error)
-	Watch(ctx context.Context, namespace string, filter *Filter) (<-chan ServiceEvent, error)
+	Discover(ctx context.Context, filter *Filter) ([]ServiceEndpoint, error)
+	Watch(ctx context.Context, filter *Filter) (<-chan ServiceEvent, error)
 	Name() string
 }

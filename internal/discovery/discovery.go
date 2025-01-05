@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	logger "github.com/goletan/logger-library/pkg"
+	"github.com/goletan/services-library/internal/discovery/strategies"
 	"github.com/goletan/services-library/shared/types"
 	"go.uber.org/zap"
 	"sync"
@@ -14,9 +15,14 @@ type CompositeDiscovery struct {
 	logger     *logger.ZapLogger
 }
 
-func NewCompositeDiscovery(log *logger.ZapLogger, strategies ...types.Strategy) *CompositeDiscovery {
+func NewCompositeDiscovery(log *logger.ZapLogger, config *types.ServicesConfig) *CompositeDiscovery {
+	strats, err := initStrategies(log, config)
+	if err != nil {
+		log.Fatal("Failed to initialize discovery strategies", zap.Error(err))
+	}
+
 	return &CompositeDiscovery{
-		strategies: strategies,
+		strategies: strats,
 		logger:     log,
 	}
 }
@@ -38,29 +44,24 @@ func (cd *CompositeDiscovery) RemoveStrategy(name string) error {
 	return fmt.Errorf("strategy not found: %s", name)
 }
 
-func (cd *CompositeDiscovery) Discover(ctx context.Context, namespace string, filter *types.Filter) ([]types.ServiceEndpoint, error) {
+func (cd *CompositeDiscovery) Discover(ctx context.Context, filter *types.Filter) ([]types.ServiceEndpoint, error) {
 	var discovered []types.ServiceEndpoint
-	var strategyErrors []error
 
 	for _, strategy := range cd.strategies {
 		cd.logger.Info("Attempting service discovery using strategy", zap.String("strategy", strategy.Name()))
-		endpoints, err := strategy.Discover(ctx, namespace, filter)
+		endpoints, err := strategy.Discover(ctx, filter)
 		if err != nil {
 			cd.logger.Warn("Discovery strategy failed", zap.String("strategy", strategy.Name()), zap.Error(err))
-			strategyErrors = append(strategyErrors, err)
 		} else {
 			discovered = append(discovered, endpoints...)
+			cd.logger.Info("Discovered services", zap.Int("count", len(endpoints)))
 		}
-	}
-
-	if len(discovered) == 0 {
-		return nil, fmt.Errorf("no services discovered in namespace: %s, errors: %v", namespace, strategyErrors)
 	}
 
 	return discovered, nil
 }
 
-func (cd *CompositeDiscovery) Watch(ctx context.Context, namespace string, filter *types.Filter) (<-chan types.ServiceEvent, error) {
+func (cd *CompositeDiscovery) Watch(ctx context.Context, filter *types.Filter) (<-chan types.ServiceEvent, error) {
 	// Single aggregated channel for service events-service
 	aggregatedEvents := make(chan types.ServiceEvent)
 
@@ -75,7 +76,7 @@ func (cd *CompositeDiscovery) Watch(ctx context.Context, namespace string, filte
 		wg.Add(1)
 		go func(strategy types.Strategy) {
 			defer wg.Done()
-			eventCh, err := strategy.Watch(watchCtx, namespace, filter)
+			eventCh, err := strategy.Watch(watchCtx, filter)
 			if err != nil {
 				cd.logger.Warn("Failed to start watcher for strategy",
 					zap.String("strategy", fmt.Sprintf("%T", strategy)),
@@ -102,4 +103,28 @@ func (cd *CompositeDiscovery) Watch(ctx context.Context, namespace string, filte
 	}()
 
 	return aggregatedEvents, nil
+}
+
+func initStrategies(logger *logger.ZapLogger, config *types.ServicesConfig) ([]types.Strategy, error) {
+	var strats []types.Strategy
+
+	for _, strategyConfig := range config.Discovery.Strategies {
+		logger.Info("Initializing discovery strategy config", zap.Any("strategyConfig", strategyConfig))
+		switch strategyConfig.Name {
+		case "kubernetes":
+			strats = append(strats, strategies.NewKubernetesStrategy(logger, strategyConfig.Namespace))
+			logger.Info("Using Kubernetes strategy", zap.String("namespace", strategyConfig.Namespace))
+		case "docker":
+			strats = append(strats, strategies.NewDockerSwarmStrategy(logger, strategyConfig.Network))
+			logger.Info("Using Docker Swarm strategy", zap.String("network", strategyConfig.Network))
+		case "dns":
+			strats = append(strats, strategies.NewDNSStrategy(logger, strategyConfig.Domain))
+			logger.Info("Using DNS strategy", zap.String("domain", strategyConfig.Domain))
+		default:
+			logger.Warn("Unknown strategy specified, defaulting to Kubernetes.", zap.String("strategy", strategyConfig.Name))
+			return nil, fmt.Errorf("unknown strategy: %s", strategyConfig.Name)
+		}
+	}
+
+	return strats, nil
 }

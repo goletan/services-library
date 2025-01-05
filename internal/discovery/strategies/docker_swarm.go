@@ -13,12 +13,16 @@ import (
 )
 
 type DockerSwarmStrategy struct {
-	logger *logger.ZapLogger
+	logger       *logger.ZapLogger
+	swarmNetwork string
 }
 
 // NewDockerSwarmStrategy creates a new Docker Swarm discovery strategy.
-func NewDockerSwarmStrategy(logger *logger.ZapLogger) *DockerSwarmStrategy {
-	return &DockerSwarmStrategy{logger: logger}
+func NewDockerSwarmStrategy(logger *logger.ZapLogger, network string) *DockerSwarmStrategy {
+	return &DockerSwarmStrategy{
+		logger:       logger,
+		swarmNetwork: network,
+	}
 }
 
 // Name returns the name of the strategy.
@@ -26,8 +30,8 @@ func (d *DockerSwarmStrategy) Name() string {
 	return "docker_swarm"
 }
 
-func (d *DockerSwarmStrategy) Discover(ctx context.Context, namespace string, filter *types.Filter) ([]types.ServiceEndpoint, error) {
-	d.logger.Info("Using Docker Swarm strategy for service discovery", zap.String("namespace", namespace))
+func (d *DockerSwarmStrategy) Discover(ctx context.Context, filter *types.Filter) ([]types.ServiceEndpoint, error) {
+	d.logger.Info("Using Docker Swarm strategy for service discovery", zap.String("swarmNetwork", d.swarmNetwork))
 
 	// Create Docker client
 	cli, err := client.NewClientWithOpts(client.FromEnv)
@@ -36,7 +40,7 @@ func (d *DockerSwarmStrategy) Discover(ctx context.Context, namespace string, fi
 		return nil, err
 	}
 
-	// Find the target network by namespace
+	// Find the target network by swarmNetwork
 	var targetNetworkID string
 	networks, err := cli.NetworkList(ctx, network.ListOptions{})
 	if err != nil {
@@ -45,15 +49,15 @@ func (d *DockerSwarmStrategy) Discover(ctx context.Context, namespace string, fi
 	}
 
 	for _, net := range networks {
-		if net.Name == namespace {
+		if net.Name == d.swarmNetwork {
 			targetNetworkID = net.ID
 			break
 		}
 	}
 
 	if targetNetworkID == "" {
-		d.logger.Warn("No matching network found for namespace", zap.String("namespace", namespace))
-		return nil, fmt.Errorf("network not found: %s", namespace)
+		d.logger.Warn("No matching network found for swarmNetwork", zap.String("swarmNetwork", d.swarmNetwork))
+		return nil, fmt.Errorf("network not found: %s", d.swarmNetwork)
 	}
 
 	// List services in Swarm
@@ -89,8 +93,8 @@ func (d *DockerSwarmStrategy) Discover(ctx context.Context, namespace string, fi
 	}
 
 	if len(endpoints) == 0 {
-		d.logger.Warn("No services discovered in the target network", zap.String("namespace", namespace))
-		return nil, fmt.Errorf("no services discovered in namespace: %s", namespace)
+		d.logger.Warn("No services discovered in the target swarm network", zap.String("swarmNetwork", d.swarmNetwork))
+		return nil, fmt.Errorf("no services discovered in swarm network: %s", d.swarmNetwork)
 	}
 
 	// Log discovered endpoints
@@ -103,9 +107,9 @@ func (d *DockerSwarmStrategy) Discover(ctx context.Context, namespace string, fi
 	return endpoints, nil
 }
 
-// Watch watches for service changes in the Docker Swarm namespace.
-func (d *DockerSwarmStrategy) Watch(ctx context.Context, namespace string, filter *types.Filter) (<-chan types.ServiceEvent, error) {
+// Watch watches for service changes in the Docker Swarm swarmNetwork.
+func (d *DockerSwarmStrategy) Watch(ctx context.Context, filter *types.Filter) (<-chan types.ServiceEvent, error) {
 	// TODO: Implement watch functionality for Docker Swarm services
-	d.logger.Info("Watching Docker Swarm services is not implemented yet", zap.String("namespace", namespace))
+	d.logger.Info("Watching Docker Swarm services is not implemented yet", zap.String("swarmNetwork", d.swarmNetwork))
 	return nil, fmt.Errorf("watch functionality not implemented")
 }

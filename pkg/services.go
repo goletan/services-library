@@ -4,16 +4,18 @@ import (
 	"context"
 	"fmt"
 	observability "github.com/goletan/observability-library/pkg"
+	"github.com/goletan/services-library/internal/config"
 	"github.com/goletan/services-library/internal/discovery"
-	"github.com/goletan/services-library/internal/discovery/strategies"
 	"github.com/goletan/services-library/internal/metrics"
 	"github.com/goletan/services-library/internal/registry"
 	"github.com/goletan/services-library/shared/types"
+	"go.uber.org/zap"
 	"sync"
 )
 
 // Services encapsulates service discovery, registration, and lifecycle management.
 type Services struct {
+	cfg             *types.ServicesConfig
 	discovery       *discovery.CompositeDiscovery
 	registry        *registry.Registry
 	metrics         *metrics.ServicesMetrics
@@ -22,23 +24,19 @@ type Services struct {
 
 // NewServices initializes a new Services instance with strategy-based discovery mechanisms.
 func NewServices(obs *observability.Observability) (*Services, error) {
-
-	discoveryStrategies := []types.Strategy{
-		strategies.NewKubernetesStrategy(obs.Logger),
-		strategies.NewDockerSwarmStrategy(obs.Logger),
-		strategies.NewDNSStrategy(obs.Logger),
+	cfg, err := config.LoadServicesConfig(obs.Logger)
+	if err != nil {
+		obs.Logger.Fatal("Failed to load services-library configuration", zap.Error(err))
 	}
 
-	compositeDiscovery := discovery.NewCompositeDiscovery(
-		obs.Logger,
-		discoveryStrategies...,
-	)
+	compositeDiscovery := discovery.NewCompositeDiscovery(obs.Logger, cfg)
 
 	// Initialize registry and metrics
 	newMetrics := metrics.InitMetrics(obs)
 	newRegistry := registry.NewRegistry(obs, newMetrics)
 
 	return &Services{
+		cfg:       cfg,
 		discovery: compositeDiscovery,
 		registry:  newRegistry,
 		metrics:   newMetrics,
@@ -64,13 +62,13 @@ func (s *Services) CreateService(endpoint types.ServiceEndpoint) (types.Service,
 }
 
 // Discover discovers all services-library in a namespace.
-func (s *Services) Discover(ctx context.Context, namespace string, filter *types.Filter) ([]types.ServiceEndpoint, error) {
-	return s.discovery.Discover(ctx, namespace, filter)
+func (s *Services) Discover(ctx context.Context, filter *types.Filter) ([]types.ServiceEndpoint, error) {
+	return s.discovery.Discover(ctx, filter)
 }
 
 // Watch discovers all services-library in a namespace.
-func (s *Services) Watch(ctx context.Context, namespace string, filter *types.Filter) (<-chan types.ServiceEvent, error) {
-	return s.discovery.Watch(ctx, namespace, filter)
+func (s *Services) Watch(ctx context.Context, filter *types.Filter) (<-chan types.ServiceEvent, error) {
+	return s.discovery.Watch(ctx, filter)
 }
 
 // Register registers a service in the registry.
