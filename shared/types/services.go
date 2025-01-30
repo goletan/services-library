@@ -7,9 +7,12 @@ type ServiceFactory func(endpoint ServiceEndpoint) Service
 // Service interface that all services-library must implement.
 type Service interface {
 	Name() string
+	Type() string
+	Address() string
 	Initialize() error
-	Start() error
-	Stop() error
+	Start(ctx context.Context) error
+	Stop(ctx context.Context) error
+	Metadata() map[string]string
 }
 
 // ServiceEvent represents an event related to a service, such as its addition,
@@ -30,8 +33,9 @@ type ServiceEndpoint struct {
 	Name    string            // The name of the service (e.g., "auth-service").
 	Address string            // The IP or hostname of the service.
 	Ports   []ServicePort     // List of exposed ports and their purposes.
-	Version string            // Optional: version of the service for future use (e.g., "v1.0").
-	Tags    map[string]string // Optional: tags for categorization or discovery filters (e.g., ["grpc", "core-service"]).
+	Version string            // version of the service for future use (e.g., "1.0").
+	Tags    map[string]string // Optional: tags for categorization or discovery filters (e.g., ["grpc", "my-service"]).
+	Type    string
 }
 
 // ServicePort represents the details of a single port.

@@ -52,23 +52,27 @@ func (kd *KubernetesDiscovery) Discover(ctx context.Context, filter *types.Filte
 
 	var endpoints []types.ServiceEndpoint
 	for _, svc := range services.Items {
-		kd.logger.Info("Fetched service from Kubernetes", zap.String("name", svc.Name), zap.Any("labels", svc.Labels))
 		endpoint := types.ServiceEndpoint{
 			Name:    svc.Name,
 			Address: svc.Spec.ClusterIP,
 			Ports:   ConvertPorts(svc.Spec.Ports),
 			Tags:    svc.Labels,
 		}
+		kd.logger.Info("Found service", zap.String("name", svc.Name))
+		kd.logger.Info("Endpoint tags", zap.Any("tags", endpoint.Tags))
+		kd.logger.Info("Filter tags", zap.Any("tags", filter.Tags))
 
-		// Apply filters
-		if !MatchTags(endpoint.Tags, filter.Tags) {
-			continue
+		if isDiscoverable(endpoint.Tags, filter) {
+			endpoints = append(endpoints, endpoint)
+			kd.logger.Info("Added service to the list of discovered services", zap.String("name", svc.Name))
 		}
-
-		endpoints = append(endpoints, endpoint)
 	}
 
 	return endpoints, nil
+}
+
+func isDiscoverable(endpointTags map[string]string, filter *types.Filter) bool {
+	return MatchTags(endpointTags, filter.Tags) || MatchLabels(endpointTags, filter.Labels)
 }
 
 func (kd *KubernetesDiscovery) Watch(ctx context.Context, filter *types.Filter) (<-chan types.ServiceEvent, error) {

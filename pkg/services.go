@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"fmt"
 	observability "github.com/goletan/observability-library/pkg"
 	"github.com/goletan/services-library/internal/config"
 	"github.com/goletan/services-library/internal/discovery"
@@ -43,24 +42,6 @@ func NewServices(obs *observability.Observability) (*Services, error) {
 	}, nil
 }
 
-// RegisterFactory registers a factory for dynamically creating services-library.
-func (s *Services) RegisterFactory(name string, factory types.ServiceFactory) {
-	s.factoryRegistry.Store(name, factory)
-}
-
-// CreateService dynamically creates a Service using a registered factory.
-func (s *Services) CreateService(endpoint types.ServiceEndpoint) (types.Service, error) {
-	factoryInterface, ok := s.factoryRegistry.Load(endpoint.Name)
-	if !ok {
-		return nil, fmt.Errorf("no factory registered for service: %s", endpoint.Name)
-	}
-	factory, ok := factoryInterface.(types.ServiceFactory)
-	if !ok {
-		return nil, fmt.Errorf("invalid factory for service: %s", endpoint.Name)
-	}
-	return factory(endpoint), nil
-}
-
 // Discover discovers all services-library in a namespace.
 func (s *Services) Discover(ctx context.Context, filter *types.Filter) ([]types.ServiceEndpoint, error) {
 	return s.discovery.Discover(ctx, filter)
@@ -72,8 +53,8 @@ func (s *Services) Watch(ctx context.Context, filter *types.Filter) (<-chan type
 }
 
 // Register registers a service in the registry.
-func (s *Services) Register(service types.Service) error {
-	return s.registry.Register(service)
+func (s *Services) Register(endpoint types.ServiceEndpoint) (types.Service, error) {
+	return s.registry.Register(endpoint)
 }
 
 // InitializeAll initializes all registered services-library in the registry.
@@ -89,4 +70,9 @@ func (s *Services) StartAll(ctx context.Context) error {
 // StopAll stops all registered services-library in the registry.
 func (s *Services) StopAll(ctx context.Context) error {
 	return s.registry.StopAll(ctx)
+}
+
+// GetService retrieves a service by name from the registry. Returns the service and a boolean indicating if it was found.
+func (s *Services) GetService(name string) (types.Service, bool) {
+	return s.registry.GetService(name)
 }
