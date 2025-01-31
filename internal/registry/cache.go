@@ -57,11 +57,9 @@ func (sc *ServiceCache) exists(name string) bool {
 
 // rangeAll iterates over all services in the cache and applies a handler function.
 func (sc *ServiceCache) rangeAll(handler func(name string, service types.Service)) {
-	sc.logger.Info("Iterating over cache...")
 	sc.cache.Range(func(key, value interface{}) bool {
 		service, ok := value.(types.Service)
 		if ok {
-			sc.logger.Info("Handling service", zap.String("name", key.(string)))
 			handler(key.(string), service)
 		}
 		return true

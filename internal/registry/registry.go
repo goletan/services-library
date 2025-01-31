@@ -99,14 +99,10 @@ func (r *Registry) StopAll(ctx context.Context) error {
 }
 
 func (r *Registry) List() []types.Service {
-	r.obs.Logger.Info("Listing services...")
-
 	var servicesList []types.Service
 	r.cache.rangeAll(func(name string, service types.Service) {
-		r.obs.Logger.Info("Service listed", zap.String("name", name))
 		servicesList = append(servicesList, service)
 	})
-	r.obs.Logger.Info("Total services listed", zap.Int("count", len(servicesList)))
 
 	return servicesList
 }
