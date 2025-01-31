@@ -58,9 +58,6 @@ func (kd *KubernetesDiscovery) Discover(ctx context.Context, filter *types.Filte
 			Ports:   ConvertPorts(svc.Spec.Ports),
 			Tags:    svc.Labels,
 		}
-		kd.logger.Info("Found service", zap.String("name", svc.Name))
-		kd.logger.Info("Endpoint tags", zap.Any("tags", endpoint.Tags))
-		kd.logger.Info("Filter tags", zap.Any("tags", filter.Tags))
 
 		if isDiscoverable(endpoint.Tags, filter) {
 			endpoints = append(endpoints, endpoint)

@@ -7,6 +7,7 @@ import (
 	"github.com/goletan/services-library/internal/metrics"
 	"github.com/goletan/services-library/shared/types"
 	"go.uber.org/zap"
+	"time"
 )
 
 // ServiceConstructor defines a function that creates a new Service from an endpoint.
@@ -21,10 +22,11 @@ type Registry struct {
 
 // NewRegistry creates a new Registry instance with observability-library and metrics.
 func NewRegistry(obs *observability.Observability, met *metrics.ServicesMetrics) *Registry {
+	serviceCache := NewCache(obs.Logger)
 	return &Registry{
 		obs:     obs,
 		metrics: met,
-		cache:   NewCache(obs.Logger),
+		cache:   serviceCache,
 	}
 }
 
@@ -40,6 +42,29 @@ func (r *Registry) Register(endpoint types.ServiceEndpoint) (types.Service, erro
 	r.cache.store(endpoint.Name, service)
 	r.obs.Logger.Info("Service registered", zap.String("service", endpoint.Name))
 	return service, nil
+}
+
+func (r *Registry) Unregister(name string) error {
+	// Check if the service exists
+	service, exists := r.cache.get(name)
+	if !exists {
+		r.obs.Logger.Warn("Attempted to unregister a non-existent service", zap.String("service", name))
+		return fmt.Errorf("service not found: %s", name)
+	}
+
+	// Stop the service before removal
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := service.Stop(ctx); err != nil {
+		r.obs.Logger.Error("Failed to stop service before unregistering", zap.String("service", name), zap.Error(err))
+		return fmt.Errorf("failed to stop service '%s' before unregistering: %w", name, err)
+	}
+
+	// Remove from cache
+	r.cache.delete(name)
+	r.obs.Logger.Info("Service unregistered successfully", zap.String("service", name))
+	return nil
 }
 
 // GetService retrieves a registered service.
@@ -71,6 +96,19 @@ func (r *Registry) StopAll(ctx context.Context) error {
 	return r.processAllServices(ctx, "stop", func(ctx context.Context, service types.Service) error {
 		return service.Stop(ctx)
 	})
+}
+
+func (r *Registry) List() []types.Service {
+	r.obs.Logger.Info("Listing services...")
+
+	var servicesList []types.Service
+	r.cache.rangeAll(func(name string, service types.Service) {
+		r.obs.Logger.Info("Service listed", zap.String("name", name))
+		servicesList = append(servicesList, service)
+	})
+	r.obs.Logger.Info("Total services listed", zap.Int("count", len(servicesList)))
+
+	return servicesList
 }
 
 // processAllServices applies an operation (initialize/start/stop) to all registered services-library.

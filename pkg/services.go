@@ -9,16 +9,14 @@ import (
 	"github.com/goletan/services-library/internal/registry"
 	"github.com/goletan/services-library/shared/types"
 	"go.uber.org/zap"
-	"sync"
 )
 
 // Services encapsulates service discovery, registration, and lifecycle management.
 type Services struct {
-	cfg             *types.ServicesConfig
-	discovery       *discovery.CompositeDiscovery
-	registry        *registry.Registry
-	metrics         *metrics.ServicesMetrics
-	factoryRegistry sync.Map
+	cfg       *types.ServicesConfig
+	discovery *discovery.CompositeDiscovery
+	registry  *registry.Registry
+	metrics   *metrics.ServicesMetrics
 }
 
 // NewServices initializes a new Services instance with strategy-based discovery mechanisms.
@@ -57,6 +55,11 @@ func (s *Services) Register(endpoint types.ServiceEndpoint) (types.Service, erro
 	return s.registry.Register(endpoint)
 }
 
+// Unregister unregisters a service in the registry
+func (s *Services) Unregister(name string) error {
+	return s.registry.Unregister(name)
+}
+
 // InitializeAll initializes all registered services-library in the registry.
 func (s *Services) InitializeAll(ctx context.Context) error {
 	return s.registry.InitializeAll(ctx)
@@ -75,4 +78,9 @@ func (s *Services) StopAll(ctx context.Context) error {
 // GetService retrieves a service by name from the registry. Returns the service and a boolean indicating if it was found.
 func (s *Services) GetService(name string) (types.Service, bool) {
 	return s.registry.GetService(name)
+}
+
+// List retrieves all registered Services
+func (s *Services) List() []types.Service {
+	return s.registry.List()
 }

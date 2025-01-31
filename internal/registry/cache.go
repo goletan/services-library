@@ -21,8 +21,9 @@ func NewCache(logger *logger.ZapLogger) *ServiceCache {
 
 // store stores a key-value pair in the cache.
 func (sc *ServiceCache) store(name string, service types.Service) {
+	sc.logger.Info("Storing service in cache", zap.String("name", name))
 	sc.cache.Store(name, service)
-	sc.logger.Debug("Added to cache", zap.String("name", name))
+	sc.logger.Info("Added to cache", zap.String("name", name))
 }
 
 // get retrieves a value by key from the cache, returning the value and a bool indicating success.
@@ -42,16 +43,27 @@ func (sc *ServiceCache) get(name string) (types.Service, bool) {
 	return service, true
 }
 
+// delete removes a service from the cache.
+func (sc *ServiceCache) delete(name string) {
+	sc.cache.Delete(name)
+	sc.logger.Info("Removed from cache", zap.String("name", name))
+}
+
 // exists checks if a key exists in the cache.
 func (sc *ServiceCache) exists(name string) bool {
 	_, exists := sc.cache.Load(name)
 	return exists
 }
 
-// rangeAll iterates over all items in the cache and applies the handler function to each.
+// rangeAll iterates over all services in the cache and applies a handler function.
 func (sc *ServiceCache) rangeAll(handler func(name string, service types.Service)) {
+	sc.logger.Info("Iterating over cache...")
 	sc.cache.Range(func(key, value interface{}) bool {
-		handler(key.(string), value.(types.Service))
+		service, ok := value.(types.Service)
+		if ok {
+			sc.logger.Info("Handling service", zap.String("name", key.(string)))
+			handler(key.(string), service)
+		}
 		return true
 	})
 }
